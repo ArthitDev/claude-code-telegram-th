@@ -569,6 +569,13 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ---
 
+## 👏 Credits
+
+This project is a fork of [claude-code-telegram](https://github.com/Angusstone7/claude-code-telegram) by [Angusstone7](https://github.com/Angusstone7).
+Huge thanks to the original author for the amazing work!
+
+---
+
 ## 🙏 Acknowledgments
 
 Built with these amazing tools:
