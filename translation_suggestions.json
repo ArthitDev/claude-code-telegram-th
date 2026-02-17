@@ -1,0 +1,13 @@
+{
+  "error.generic": "❌ ข้อผิดพลาด: {error}",
+  "error.download": "❌ ข้อผิดพลาดการดาวน์โหลด: {error}",
+  "error.processing": "❌ ข้อผิดพลาดการประมวลผล: {error}",
+  "error.proxy_setup": "❌ ข้อผิดพลาดการตั้งค่าพร็อกซี: {error}",
+  "error.folder_creation": "❌ ข้อผิดพลาดการสร้างโฟลเดอร์: {error}",
+  "error.docker": "❌ ข้อผิดพลาด Docker: {error}",
+  "service.not_initialized": "⚠️ บริการยังไม่ได้เริ่มต้น",
+  "service.project_not_initialized": "⚠️ บริการโปรเจกต์ยังไม่ได้เริ่มต้น",
+  "service.account_not_initialized": "❌ บริการบัญชียังไม่ได้เริ่มต้น",
+  "service.unavailable": "⚠️ บริการไม่พร้อมใช้งาน",
+  "service.project_unavailable": "⚠️ บริการโปรเจกต์ไม่พร้อมใช้งาน"
+}
