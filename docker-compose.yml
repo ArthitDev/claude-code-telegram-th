@@ -12,19 +12,18 @@ services:
       - SSH_KEY_PATH=${SSH_KEY_PATH:-/app/bot_key}
     volumes:
       # SSH private key for host access (read-only)
-      # Generate with: ssh-keygen -t ed25519 -f ./bot_key -N ""
-      # Add public key to host: cat ./bot_key.pub >> ~/.ssh/authorized_keys
       - ./bot_key:/app/bot_key:ro
       # Persistent storage for database and logs
       - ./data:/app/data
       - ./logs:/app/logs
       # Projects directory - persists across container rebuilds
       - ./projects:/root/projects
+      # Host home directory for accessing projects
+      - /home/epit:/home/epit
       # Claude Code sessions - preserves conversation history and context compression
       - ./claude_sessions:/root/.claude
-      # Claude Account credentials (optional - for OAuth auth instead of API key)
-      # Get this file by running `claude` locally and authenticating via browser
-      # - ./claude_config.json:/root/.config/claude/config.json:ro
+      # Docker socket for managing containers from within the container
+      - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
       # Allows container to connect to host machine via SSH
       - "host.docker.internal:host-gateway"

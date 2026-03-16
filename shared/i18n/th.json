@@ -57,6 +57,7 @@
   "projects.name_prompt": "ป้อนชื่อโปรเจกต์:",
   "projects.path_prompt": "ป้อนพาธโปรเจกต์:",
   "projects.invalid_path": "❌ พาธไม่ถูกต้อง",
+  "project.working_dir_set": "✅ <b>ตั้งค่าโฟลเดอร์ทำงานเรียบร้อย</b>\n\n<b>Path:</b> <code>{path}</code>\n<b>Project:</b> {project}\n\nคำสั่ง Claude ทั้งหมดจะทำงานที่นี่\nส่งข้อความเพื่อเริ่มงานได้เลย",
 
   "context.title": "💬 บริบท",
   "context.current": "💬 บริบทปัจจุบัน: {name}",

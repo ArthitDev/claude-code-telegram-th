@@ -12,7 +12,7 @@ import logging
 import os
 import dataclasses
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from domain.entities.claude_code_session import ClaudeCodeSession
@@ -43,6 +43,7 @@ class UserSession:
     yolo_mode: bool = False
     step_streaming_mode: bool = True  # Default ON - show brief output without code
     context_id: Optional[str] = None
+    queue: List[Dict[str, Any]] = field(default_factory=list)  # Task queue for sequential processing
     created_at: datetime = field(default_factory=datetime.utcnow)
 
     def with_working_dir(self, path: str) -> "UserSession":
@@ -56,6 +57,7 @@ class UserSession:
             yolo_mode=self.yolo_mode,
             step_streaming_mode=self.step_streaming_mode,
             context_id=self.context_id,
+            queue=self.queue,
             created_at=self.created_at,
         )
 
@@ -70,6 +72,22 @@ class UserSession:
             yolo_mode=self.yolo_mode,
             step_streaming_mode=self.step_streaming_mode,
             context_id=self.context_id,
+            queue=self.queue,
+            created_at=self.created_at,
+        )
+    
+    def with_queue(self, queue: List[Dict[str, Any]]) -> "UserSession":
+        """Return copy with updated queue"""
+        return UserSession(
+            user_id=self.user_id,
+            working_dir=self.working_dir,
+            claude_session=self.claude_session,
+            continue_session_id=self.continue_session_id,
+            streaming_handler=self.streaming_handler,
+            yolo_mode=self.yolo_mode,
+            step_streaming_mode=self.step_streaming_mode,
+            context_id=self.context_id,
+            queue=queue,
             created_at=self.created_at,
         )
 
@@ -170,6 +188,37 @@ class UserStateManager:
             session,
             claude_session=claude_session
         )
+
+    # === Task Queue ===
+
+    def push_to_queue(self, user_id: int, item: Dict[str, Any]) -> int:
+        """Push item to task queue. Returns new queue size."""
+        session = self.get_or_create(user_id)
+        new_queue = list(session.queue) + [item]
+        self._sessions[user_id] = session.with_queue(new_queue)
+        return len(new_queue)
+
+    def pop_from_queue(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Pop next item from task queue"""
+        session = self.get(user_id)
+        if not session or not session.queue:
+            return None
+        
+        item = session.queue[0]
+        new_queue = list(session.queue[1:])
+        self._sessions[user_id] = session.with_queue(new_queue)
+        return item
+
+    def clear_queue(self, user_id: int) -> None:
+        """Clear task queue"""
+        session = self.get(user_id)
+        if session:
+            self._sessions[user_id] = session.with_queue([])
+
+    def get_queue_size(self, user_id: int) -> int:
+        """Get current queue size"""
+        session = self.get(user_id)
+        return len(session.queue) if session else 0
 
     # === YOLO Mode ===
 

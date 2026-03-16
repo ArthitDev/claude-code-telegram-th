@@ -57,6 +57,7 @@
   "projects.name_prompt": "Enter project name:",
   "projects.path_prompt": "Enter project path:",
   "projects.invalid_path": "❌ Invalid path",
+  "project.working_dir_set": "✅ <b>Working directory set</b>\n\n<b>Path:</b> <code>{path}</code>\n<b>Project:</b> {project}\n\nNow all Claude commands will be executed here.\nSend a message to start working.",
 
   "context.title": "💬 Context",
   "context.current": "💬 Current context: {name}",

@@ -57,6 +57,7 @@
   "projects.name_prompt": "Введите название проекта:",
   "projects.path_prompt": "Введите путь к проекту:",
   "projects.invalid_path": "❌ Неверный путь",
+  "project.working_dir_set": "✅ <b>Рабочая директория установлена</b>\n\n<b>Путь:</b> <code>{path}</code>\n<b>Проект:</b> {project}\n\nТеперь все команды Claude будут выполняться здесь.\nОтправьте сообщение, чтобы начать работу.",
 
   "context.title": "💬 Контекст",
   "context.current": "💬 Текущий контекст: {name}",

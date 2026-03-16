@@ -297,6 +297,37 @@ class MessageHandlers:
             is_running = self.claude_proxy.is_task_running(user_id)
         return is_running
 
+    async def _process_next_in_queue(self, user_id: int):
+        """Process next task in queue if any"""
+        next_task = self._state.pop_from_queue(user_id)
+        if not next_task:
+            return
+
+        message = next_task.get("message")
+        prompt = next_task.get("prompt")
+        force_new = next_task.get("force_new_session", False)
+        
+        logger.info(f"[{user_id}] Processing next task from queue: {prompt[:50]}...")
+        
+        # Notify user
+        try:
+            queue_size = self._state.get_queue_size(user_id)
+            await message.answer(
+                f"🔄 <b>เริ่มทำงานจากคิว</b> ({queue_size} รออยู่)\n\n"
+                f"📝 {prompt[:50]}...", 
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+            
+        # Execute
+        await self.handle_text(
+            message,
+            prompt_override=prompt,
+            force_new_session=force_new,
+            _from_queue=True
+        )
+
     # === CD Command Detection (utility) ===
 
     def _detect_cd_command(self, command: str, current_dir: str) -> Optional[str]:
@@ -570,11 +601,15 @@ class MessageHandlers:
         message: Message,
         prompt_override: str = None,
         force_new_session: bool = False,
-        _from_batcher: bool = False
+        _from_batcher: bool = False,
+        _from_queue: bool = False
     ) -> None:
         """Handle text messages - main entry point"""
         user_id = message.from_user.id
         bot = message.bot
+        
+        # Determine prompt
+        prompt = prompt_override if prompt_override else message.text
 
         user = await self.bot_service.authorize_user(user_id)
         if not user:
@@ -586,8 +621,10 @@ class MessageHandlers:
         if session is None:
             # First interaction - load persisted settings
             await self._state.load_yolo_mode(user_id)
+            session = self._state.get_or_create(user_id)
 
         # === FILE REPLY HANDLING ===
+        # ... (unchanged) ...
         reply = message.reply_to_message
         if reply and self._files.has_file(reply.message_id) and self.file_processor_service:
             processed_file = self._files.pop_file(reply.message_id)
@@ -618,6 +655,7 @@ class MessageHandlers:
                 return
 
         # === SPECIAL INPUT MODES (не батчатся - обрабатываются сразу) ===
+        # ... (unchanged) ...
         logger.debug(f"[{user_id}] Checking special input modes: "
                     f"expecting_answer={self._hitl.is_expecting_answer(user_id)}, "
                     f"expecting_clarification={self._hitl.is_expecting_clarification(user_id)}")
@@ -670,7 +708,7 @@ class MessageHandlers:
         # === MESSAGE BATCHING ===
         # Объединяем несколько сообщений за 0.5с в один запрос
         # НЕ батчим если: уже из батчера, есть prompt_override, или задача уже выполняется
-        if not _from_batcher and not prompt_override and not self._is_task_running(user_id):
+        if not _from_batcher and not prompt_override and not self._is_task_running(user_id) and not _from_queue:
             # Добавляем сообщение в batch
             async def process_batched(first_msg: Message, combined_text: str):
                 await self.handle_text(
@@ -685,14 +723,30 @@ class MessageHandlers:
 
         # === CHECK IF TASK RUNNING ===
         if self._is_task_running(user_id):
-            await message.answer(
-                "Задача уже выполняется.\n\n"
-                "Используйте кнопку отмены или /cancel чтобы остановить.",
-                reply_markup=Keyboards.claude_cancel(user_id)
-            )
-            return
+            if _from_queue:
+                # Coming from queue but another task started - race condition?
+                # Just continue and let it run
+                pass
+            else:
+                # Add to queue
+                new_size = self._state.push_to_queue(user_id, {
+                    "message": message,
+                    "prompt": prompt,
+                    "force_new_session": force_new_session
+                })
+                
+                logger.info(f"[{user_id}] Task running, added to queue (pos={new_size}): {prompt[:50]}...")
+                
+                await message.answer(
+                    f"📥 <b>เพิ่มลงในคิว</b> (#{new_size})\n\n"
+                    f"📝 {prompt[:50]}...\n"
+                    f"⏳ รอคิว...",
+                    parse_mode="HTML"
+                )
+                return
 
         # === GET CONTEXT ===
+
         working_dir = self.get_working_dir(user_id)
         session_id = None if force_new_session else self._state.get_continue_session_id(user_id)
         context_id = None
@@ -1378,6 +1432,9 @@ class MessageHandlers:
 
             if result.session_id:
                 self._state.set_continue_session_id(user_id, result.session_id)
+
+            # Process next item in queue
+            await self._process_next_in_queue(user_id)
 
             if session and self.project_service:
                 new_working_dir = self._state.get_working_dir(user_id)

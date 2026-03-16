@@ -26,6 +26,24 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._browse_states = {}  # Track browsing state per user
+        self._path_ids = {}  # Map short IDs to paths
+        self._path_counter = 0  # Counter for generating IDs
+
+    def _get_path_id(self, path: str) -> str:
+        """Get or create a short ID for a path (to avoid callback_data limit)."""
+        # Find existing ID for this path
+        for pid, p in self._path_ids.items():
+            if p == path:
+                return pid
+        # Create new ID
+        self._path_counter += 1
+        pid = f"p{self._path_counter}"
+        self._path_ids[pid] = path
+        return pid
+
+    def _get_path_from_id(self, pid: str) -> str:
+        """Get path from short ID."""
+        return self._path_ids.get(pid, "/")
 
     # ============== Workspace Menu ==============
 
@@ -99,7 +117,8 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
                 try:
                     from domain.value_objects.user_id import UserId
                     uid = UserId.from_int(user_id)
-                    project = await self.project_service.get_or_create(uid, workspace.path, workspace.name)
+                    # Use create_project to ensure specific project for this path (avoid parent fallback)
+                    project = await self.project_service.create_project(uid, workspace.name, workspace.path)
                     await self.project_service.switch_project(uid, project.id)
                 except Exception as e:
                     logger.warning(f"Error updating project for workspace: {e}")
@@ -132,8 +151,12 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
         if os.name == 'nt':
             await self._show_drive_selection(callback)
         else:
-            # Linux/Mac - start from root
-            start_path = "/"
+            # Linux/Mac - start from host home directory
+            start_path = "/home/epit"
+            # Ensure path exists, fallback to root if not
+            if not os.path.exists(start_path):
+                start_path = "/"
+            
             self._browse_states[user_id] = {
                 "path": start_path,
                 "mode": "workspace_select"
@@ -216,33 +239,52 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
             # Parent directory button
             parent = os.path.dirname(path)
             if parent and parent != path:
+                parent_id = self._get_path_id(parent)
                 keyboard_rows.append([
-                    InlineKeyboardButton(text="⬆️ .. (Parent)", callback_data=f"workspace:nav:{parent}")
+                    InlineKeyboardButton(text="⬆️ .. (Parent)", callback_data=f"workspace:nav:{parent_id}")
                 ])
+
+            # Quick navigation buttons (Linux only)
+            if os.name != 'nt':
+                quick_nav = []
+                if os.path.exists("/home/epit"):
+                    home_id = self._get_path_id("/home/epit")
+                    quick_nav.append(
+                        InlineKeyboardButton(text="🏠 Home", callback_data=f"workspace:nav:{home_id}")
+                    )
+                if os.path.exists("/root/projects"):
+                    proj_id = self._get_path_id("/root/projects")
+                    quick_nav.append(
+                        InlineKeyboardButton(text="📁 Projects", callback_data=f"workspace:nav:{proj_id}")
+                    )
+                if quick_nav:
+                    keyboard_rows.append(quick_nav)
 
             # Folder buttons
             for entry in page_entries:
                 # Truncate long names
                 display_name = entry.name[:25] + "..." if len(entry.name) > 28 else entry.name
                 btn_text = f"📁 {display_name}"
-                callback_data = f"workspace:nav:{entry.path}"
+                entry_path_id = self._get_path_id(entry.path)
+                callback_data = f"workspace:nav:{entry_path_id}"
                 keyboard_rows.append([
                     InlineKeyboardButton(text=btn_text, callback_data=callback_data)
                 ])
 
             # Pagination controls
             if total_pages > 1:
+                current_path_id = self._get_path_id(path)
                 pagination_row = []
                 if page > 0:
                     pagination_row.append(
-                        InlineKeyboardButton(text="◀️ Prev", callback_data=f"workspace:page:{path}:{page-1}")
+                        InlineKeyboardButton(text="◀️ Prev", callback_data=f"workspace:page:{current_path_id}:{page-1}")
                     )
                 pagination_row.append(
                     InlineKeyboardButton(text=f"📄 {page+1}/{total_pages}", callback_data="workspace:noop")
                 )
                 if page < total_pages - 1:
                     pagination_row.append(
-                        InlineKeyboardButton(text="Next ▶️", callback_data=f"workspace:page:{path}:{page+1}")
+                        InlineKeyboardButton(text="Next ▶️", callback_data=f"workspace:page:{current_path_id}:{page+1}")
                     )
                 keyboard_rows.append(pagination_row)
 
@@ -253,9 +295,10 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
                 ])
 
             # Current path info and select button
+            path_id = self._get_path_id(path)
             keyboard_rows.append([
                 InlineKeyboardButton(text=f"✅ Select This Folder",
-                                   callback_data=f"workspace:add:{path}")
+                                   callback_data=f"workspace:add:{path_id}")
             ])
 
             # Drive selection button (Windows only)
@@ -303,11 +346,11 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
 
     async def handle_workspace_page(self, callback: CallbackQuery) -> None:
         """Handle pagination in folder browser."""
-        # Parse: workspace:page:<path>:<page_number>
+        # Parse: workspace:page:<path_id>:<page_number>
         parts = callback.data.split(":")
         if len(parts) >= 4:
-            # Rejoin path parts (path may contain colons on Windows)
-            path = ":".join(parts[2:-1])
+            path_id = parts[2]
+            path = self._get_path_from_id(path_id)
             try:
                 page = int(parts[-1])
             except ValueError:
@@ -327,9 +370,10 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
 
     async def handle_workspace_nav(self, callback: CallbackQuery) -> None:
         """Handle navigation in folder browser."""
-        # Parse: workspace:nav:<path>
+        # Parse: workspace:nav:<path_id>
         parts = callback.data.split(":", 2)
-        path = parts[2] if len(parts) > 2 else "/"
+        path_id = parts[2] if len(parts) > 2 else "p0"
+        path = self._get_path_from_id(path_id)
         user_id = callback.from_user.id
 
         self._browse_states[user_id] = {
@@ -342,9 +386,10 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
 
     async def handle_workspace_add(self, callback: CallbackQuery) -> None:
         """Add selected folder as workspace."""
-        # Parse: workspace:add:<path>
+        # Parse: workspace:add:<path_id>
         parts = callback.data.split(":", 2)
-        path = parts[2] if len(parts) > 2 else None
+        path_id = parts[2] if len(parts) > 2 else None
+        path = self._get_path_from_id(path_id) if path_id else None
         user_id = callback.from_user.id
 
         if not path or not self.workspace_service:
@@ -366,6 +411,17 @@ class WorkspaceCallbackHandler(BaseCallbackHandler):
 
             if self.message_handlers:
                 self.message_handlers.set_working_dir(user_id, path)
+
+            # Also update project service if available
+            if self.project_service:
+                try:
+                    from domain.value_objects.user_id import UserId
+                    uid = UserId.from_int(user_id)
+                    # Use create_project to ensure specific project for this path (avoid parent fallback)
+                    project = await self.project_service.create_project(uid, workspace.name, workspace.path)
+                    await self.project_service.switch_project(uid, project.id)
+                except Exception as e:
+                    logger.warning(f"Error updating project for workspace: {e}")
 
             # Show confirmation
             keyboard = InlineKeyboardMarkup(inline_keyboard=[

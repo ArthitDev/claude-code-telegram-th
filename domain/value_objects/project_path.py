@@ -12,6 +12,10 @@ import os
 
 def _get_default_root() -> str:
     """Get default projects root based on OS"""
+    # Check for Docker-mounted host directory first
+    if os.path.exists("/home/epit"):
+        return "/home/epit"
+    
     if os.name == 'nt':  # Windows
         return os.path.join(os.path.expanduser("~"), "projects")
     else:  # Linux/macOS

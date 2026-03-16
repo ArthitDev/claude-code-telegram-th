@@ -57,6 +57,7 @@
   "projects.name_prompt": "输入项目名称：",
   "projects.path_prompt": "输入项目路径：",
   "projects.invalid_path": "❌ 路径无效",
+  "project.working_dir_set": "✅ <b>工作目录已设置</b>\n\n<b>路径:</b> <code>{path}</code>\n<b>项目:</b> {project}\n\n现在所有 Claude 命令都将在此处执行。\n发送消息以开始工作。",
 
   "context.title": "💬 上下文",
   "context.current": "💬 当前上下文：{name}",

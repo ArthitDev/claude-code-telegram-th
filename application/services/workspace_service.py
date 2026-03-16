@@ -43,6 +43,10 @@ class WorkspaceService:
     """
 
     def __init__(self, storage_path: str = "data/workspaces.json"):
+        self.storage_path = storage_path
+        self._workspaces: dict[str, Workspace] = {}
+        self._current_workspace_id: Optional[str] = None
+        
         # Initialize default workspaces dynamically based on OS
         root_path = ProjectPath.ROOT
         self.DEFAULT_WORKSPACES = {
@@ -51,11 +55,7 @@ class WorkspaceService:
             "/app": "App",
             "/tmp": "Temp" if os.name != 'nt' else os.path.join(os.path.expanduser("~"), "AppData", "Local", "Temp")
         }
-
-    def __init__(self, storage_path: str = "data/workspaces.json"):
-        self.storage_path = storage_path
-        self._workspaces: dict[str, Workspace] = {}
-        self._current_workspace_id: Optional[str] = None
+        
         self._load_workspaces()
 
     def _load_workspaces(self):
