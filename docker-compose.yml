@@ -31,6 +31,15 @@ services:
       - ./claude_sessions:/root/.claude
       # Docker socket for managing containers from within the container
       - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      /bin/bash -c "
+      echo 'Updating Claude Code CLI...' &&
+      npm install -g @anthropic-ai/claude-code@latest &&
+      echo 'Updating Claude Agent SDK...' &&
+      pip install --upgrade claude-agent-sdk &&
+      echo 'Starting Bot...' &&
+      python main.py
+      "
     extra_hosts:
       # Allows container to connect to host machine via SSH
       - "host.docker.internal:host-gateway"
