@@ -11,6 +11,13 @@ services:
       - SSH_PORT=${SSH_PORT:-22}
       - SSH_KEY_PATH=${SSH_KEY_PATH:-/app/bot_key}
     volumes:
+      # Hot-reload mapping for python source code
+      - ./application:/app/application
+      - ./domain:/app/domain
+      - ./infrastructure:/app/infrastructure
+      - ./presentation:/app/presentation
+      - ./shared:/app/shared
+      - ./main.py:/app/main.py
       # SSH private key for host access (read-only)
       - ./bot_key:/app/bot_key:ro
       # Persistent storage for database and logs
