@@ -260,6 +260,10 @@ class CommandHandlers:
         await self.bot_service.clear_session(user_id)
         await message.answer(f"{t('fresh.done')}\n\n{t('context.session_cleared')}", parse_mode="HTML")
 
+    async def fresh(self, message: Message) -> None:
+        """Handle /fresh command"""
+        await self.session(message)
+
     async def stats(self, message: Message) -> None:
         """Handle /stats command"""
         user_lang = await self._get_user_lang(message.from_user.id)
